@@ -1,4 +1,4 @@
-# Librarybot specific files
+# LibraryBot specific files
 .env
 config.yml
 library.db
