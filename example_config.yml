@@ -1,0 +1,9 @@
+discord:
+  channel: INSERT_CHANNEL_ID
+  admin_user: INSERT_USER_ID
+library:
+  about: This is my library. My library is amazing.
+  borrow_message: Great! Thanks for using my amazing library.
+  loans:
+    period: 60
+    max: 2
