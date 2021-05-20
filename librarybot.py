@@ -25,37 +25,39 @@ __maintainer__ = "Matthew Broadbent"
 __email__ = "matt@matthewbroadbent.net"
 __status__ = "Development"
 
-db = sqlite3.connect("library.db")
-cursor = db.cursor()
+if __name__ == '__main__':
 
-load_dotenv()
-TOKEN = os.getenv('DISCORD_TOKEN')
+	db = sqlite3.connect("library.db")
+	cursor = db.cursor()
 
-config_path = "config.yml"
-try:
-	config_path = sys.argv[1]
-except IndexError:
-	pass
+	load_dotenv()
+	TOKEN = os.getenv('DISCORD_TOKEN')
 
-with open(config_path, "r") as ymlfile:
-	cfg = yaml.safe_load(ymlfile)
-DISCORD_CHANNEL = cfg['discord']['channel']
-ADMIN_USER = cfg['discord']['admin_user']
-ABOUT = cfg['library']['about']
-BORROW_MESSAGE = cfg['library']['borrow_message']
-LOAN_PERIOD = int(cfg['library']['loans']['period'])
-MAX_LOANS = int(cfg['library']['loans']['max'])
+	config_path = "config.yml"
+	try:
+		config_path = sys.argv[1]
+	except IndexError:
+		pass
 
-HAPPY_EMOJI = [':grin:', ':smile:', ':smiley:', ':slight_smile:', ':grinning:']
-SAD_EMOJI = [':sob:', ':cry:', ':worried:', ':pleading_face:', ':slight_frown:']
+	with open(config_path, "r") as ymlfile:
+		cfg = yaml.safe_load(ymlfile)
+	DISCORD_CHANNEL = cfg['discord']['channel']
+	ADMIN_USER = cfg['discord']['admin_user']
+	ABOUT = cfg['library']['about']
+	BORROW_MESSAGE = cfg['library']['borrow_message']
+	LOAN_PERIOD = int(cfg['library']['loans']['period'])
+	MAX_LOANS = int(cfg['library']['loans']['max'])
 
-help_command = commands.DefaultHelpCommand(no_category='Commands')
+	HAPPY_EMOJI = [':grin:', ':smile:', ':smiley:', ':slight_smile:', ':grinning:']
+	SAD_EMOJI = [':sob:', ':cry:', ':worried:', ':pleading_face:', ':slight_frown:']
 
-bot = commands.Bot(
-	command_prefix=commands.when_mentioned_or('!'),
-	description='A Discord bot for managing and maintaining a physical book library.',
-	help_command=help_command
-)
+	help_command = commands.DefaultHelpCommand(no_category='Commands')
+
+	bot = commands.Bot(
+		command_prefix=commands.when_mentioned_or('!'),
+		description='A Discord bot for managing and maintaining a physical book library.',
+		help_command=help_command
+	)
 
 
 @bot.command(name='init', pass_context=True, hidden=True)
