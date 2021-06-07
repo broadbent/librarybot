@@ -145,6 +145,8 @@ async def search(ctx, scope: str = 'all', attr: str = '*', value: str = '*'):
 
 	"""
 	res = []
+	if attr == 'author':
+		attr = 'authors'
 	if scope == 'all':
 		if attr == '*':
 			res = cursor.execute("SELECT * FROM books ORDER BY title").fetchall()
