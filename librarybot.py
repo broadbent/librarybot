@@ -439,6 +439,9 @@ async def delete(ctx, isbn: str):
 
 	"""
 	if await auth_check(ctx):
+		cursor.execute(
+			"UPDATE loans SET returned = TRUE, rdate = '" + str(datetime.datetime.now()) + "' WHERE isbn IS '" +
+			isbn + "';")
 		cursor.execute("DELETE FROM books WHERE isbn IS '" + isbn + "';")
 		db.commit()
 		await respond(ctx, ['Book deleted.'], admin=True)
