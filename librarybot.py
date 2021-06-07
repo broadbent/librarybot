@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
 
 	bot = commands.Bot(
-		command_prefix=commands.when_mentioned_or('!'),
+		command_prefix=commands.when_mentioned_or('?'),
 		description='A Discord bot for managing and maintaining a physical book library.',
 		help_command=help_command
 	)
@@ -100,19 +100,20 @@ async def init(ctx, path: str = 'books.csv'):
 		path: Path of file to load books from.
 
 	"""
-	db.execute("PRAGMA foreign_keys = 1")
-	cursor.execute(
-		"CREATE TABLE IF NOT EXISTS books (title TEXT NOT NULL, binding TEXT NOT NULL, authors TEXT NOT NULL, series TEXT, "
-		"available INTEGER NOT NULL, isbn TEXT PRIMARY KEY, location TEXT)")
-	cursor.execute(
-		"CREATE TABLE IF NOT EXISTS users (username TEXT NOT NULL, userid INTEGER PRIMARY KEY NOT NULL, banned BOOLEAN)")
-	cursor.execute(
-		"CREATE TABLE IF NOT EXISTS loans (rdate TIME, bdate TIME NOT NULL, estrdate TIME NOT NULL, returned BOOLEAN, "
-		"userid INTEGER, isbn TEXT, FOREIGN KEY (userid) REFERENCES users (userid), FOREIGN KEY (isbn) REFERENCES books ("
-		"isbn))")
-	await bot.wait_until_ready()
-	await ctx.invoke(bot.get_command('load'), path=path)
-	await respond(ctx, ['Bot successfully initialised.'], admin=True)
+	if await auth_check(ctx) and channel_check(ctx):
+		db.execute("PRAGMA foreign_keys = 1")
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS books (title TEXT NOT NULL, binding TEXT NOT NULL, authors TEXT NOT NULL, series TEXT, "
+			"available INTEGER NOT NULL, isbn TEXT PRIMARY KEY, location TEXT)")
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS users (username TEXT NOT NULL, userid INTEGER PRIMARY KEY NOT NULL, banned BOOLEAN)")
+		cursor.execute(
+			"CREATE TABLE IF NOT EXISTS loans (rdate TIME, bdate TIME NOT NULL, estrdate TIME NOT NULL, returned BOOLEAN, "
+			"userid INTEGER, isbn TEXT, FOREIGN KEY (userid) REFERENCES users (userid), FOREIGN KEY (isbn) REFERENCES books ("
+			"isbn))")
+		await bot.wait_until_ready()
+		await ctx.invoke(bot.get_command('load'), path=path)
+		await respond(ctx, ['Bot successfully initialised.'], admin=True)
 
 
 @bot.command(name='load', pass_context=True, hidden=True)
@@ -123,7 +124,7 @@ async def load(ctx, path: str = 'books.csv'):
 		ctx: Discord message content
 		path: Path of file to load books from.
 	"""
-	if await auth_check(ctx, ):
+	if await auth_check(ctx) and await channel_check(ctx):
 		with open(path) as csv_file:
 			csv_reader = csv.reader(csv_file, delimiter=',')
 			line_count = 0
@@ -171,23 +172,24 @@ async def search(ctx, scope: str = 'all', attr: str = '*', value: str = '*'):
 		value (str): term to search for e.g. abnett
 
 	"""
-	res = []
-	if attr == 'author':
-		attr = 'authors'
-	if scope == 'all':
-		if attr == '*':
-			res = cursor.execute("SELECT * FROM books ORDER BY title").fetchall()
-		else:
+	if await channel_check(ctx):
+		res = []
+		if attr == 'author':
+			attr = 'authors'
+		if scope == 'all':
+			if attr == '*':
+				res = cursor.execute("SELECT * FROM books ORDER BY title").fetchall()
+			else:
+				res = cursor.execute(
+					"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' ORDER BY title;").fetchall()
+		elif scope == 'available':
 			res = cursor.execute(
-				"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' ORDER BY title;").fetchall()
-	elif scope == 'available':
-		res = cursor.execute(
-			"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' AND available >= 1 ORDER BY title;").fetchall()
-	elif scope == 'unavailable':
-		res = cursor.execute(
-			"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' AND available = 0 ORDER BY title;").fetchall()
-	res = format_book_records(res)
-	await respond(ctx, res, dm=True)
+				"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' AND available >= 1 ORDER BY title;").fetchall()
+		elif scope == 'unavailable':
+			res = cursor.execute(
+				"SELECT * FROM books WHERE " + attr + " LIKE '%" + value + "%' AND available = 0 ORDER BY title;").fetchall()
+		res = format_book_records(res)
+		await respond(ctx, res, dm=True)
 
 
 @bot.command(name='loans', pass_context=True, hidden=True)
@@ -200,7 +202,7 @@ async def loans(ctx, scope: str = 'all'):
 			those 'overdue'.
 
 	"""
-	if await auth_check(ctx, ):
+	if await auth_check(ctx) and await channel_check(ctx):
 		res = []
 		if scope == 'all':
 			res = cursor.execute("SELECT * FROM loans").fetchall()
@@ -217,28 +219,31 @@ async def loans(ctx, scope: str = 'all'):
 @bot.command(name='users', pass_context=True, hidden=True)
 async def users_(ctx):
 	"""Fetch a list of users."""
-	users = cursor.execute("SELECT * FROM users").fetchall()
-	await respond(ctx, users, admin=True, fast=True)
+	if await auth_check(ctx) and await channel_check(ctx):
+		users = cursor.execute("SELECT * FROM users").fetchall()
+		await respond(ctx, users, admin=True, fast=True)
 
 
 @bot.command(name='version', pass_context=True, hidden=True)
 async def version(ctx, ):
 	"""Print the version of this bot."""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		await respond(ctx, [__version__], admin=True)
 
 
 @bot.command(name='about', pass_context=True, help='Learn more about this library')
 async def about(ctx, ):
 	"""Learn more about this library."""
-	await respond(ctx, [ABOUT])
+	if await channel_check(ctx):
+		await respond(ctx, [ABOUT])
 
 
 @bot.command(name='tutorial', pass_context=True, help='Get a short tutorial on how to use this library')
 async def tutorial(ctx, ):
 	"""Get a short tutorial on how to use this library."""
-	for message in TUTORIAL:
-		await respond(ctx, [message])
+	if await channel_check(ctx):
+		for message in TUTORIAL:
+			await respond(ctx, [message], dm=True)
 
 
 @bot.command(name='issue', pass_context=True, help='Report an issue to the administrator')
@@ -249,10 +254,11 @@ async def issue_(ctx, issue: str):
 		issue: the issue to report to the administrator
 
 	"""
-	user_id = str(ctx.message.author.id)
-	user = await bot.fetch_user(int(user_id))
-	await respond(ctx, ["Thanks! You're issue has been forwarded to the administrator " + random.choice(HAPPY_EMOJI)])
-	await respond(ctx, ['Issue reported by: ' + str(user), issue], admin=True)
+	if await channel_check(ctx):
+		user_id = str(ctx.message.author.id)
+		user = await bot.fetch_user(int(user_id))
+		await respond(ctx, ["Thanks! You're issue has been forwarded to the administrator " + random.choice(HAPPY_EMOJI)])
+		await respond(ctx, ['Issue reported by: ' + str(user), issue], admin=True)
 
 
 @bot.command(name='borrow', pass_context=True, help='Borrow a book from the library')
@@ -267,45 +273,46 @@ async def borrow(ctx, isbn: str):
 		isbn: ISBN number of the book to borrow
 
 	"""
-	user_id = ctx.message.author.id
-	user = str(await bot.fetch_user(user_id))
-	res = cursor.execute("SELECT * FROM users WHERE userid = '" + str(user_id) + "';").fetchone()
-	messages = []
-	if res is None:
-		messages.append('Welcome to the library <@' + str(user_id) + '>! ' + random.choice(HAPPY_EMOJI))
-		cursor.execute("INSERT INTO users VALUES ('" + str(user) + "'," + str(user_id) + ", 0)")
-		db.commit()
-	elif res[2]:
-		await respond(ctx, ["It looks like you're banned from borrowing books! " + random.choice(SAD_EMOJI),
-							"Please message <@" + str(ADMIN_USER) + "> if you think there is an error or a mistake.\n"])
-		return
-	unique_loan = len(cursor.execute(
-		"SELECT userid FROM loans WHERE userid = '" + str(user_id) + "' AND isbn = '" + str(
-			isbn) + "' AND returned IS FALSE;").fetchall())
-	if unique_loan == 0:
-		current_loans = len(cursor.execute(
-			"SELECT isbn FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall())
-		if current_loans < MAX_LOANS:
-			available = cursor.execute(
-				"SELECT * FROM books WHERE isbn IS '" + isbn + "' AND available >= 1;").fetchone()
-			if available is not None:
-				cursor.execute(
-					"UPDATE books SET available = available - 1 WHERE isbn IS '" + isbn + "' AND available >= 1;")
-				cursor.execute("INSERT INTO loans VALUES (NULL, '" + str(datetime.datetime.now()) + "', '" + str(
-					datetime.datetime.now() + datetime.timedelta(days=LOAN_PERIOD)) + "', FALSE, " + str(
-					user_id) + ", '" + isbn + "');")
-				db.commit()
-				messages.append('Great! The book is yours. ' + random.choice(HAPPY_EMOJI))
-				messages.append(BORROW_MESSAGE)
-				await respond(ctx, ["New Loan from " + user, isbn], admin=True)
+	if await channel_check(ctx):
+		user_id = ctx.message.author.id
+		user = str(await bot.fetch_user(user_id))
+		res = cursor.execute("SELECT * FROM users WHERE userid = '" + str(user_id) + "';").fetchone()
+		messages = []
+		if res is None:
+			messages.append('Welcome to the library <@' + str(user_id) + '>! ' + random.choice(HAPPY_EMOJI))
+			cursor.execute("INSERT INTO users VALUES ('" + str(user) + "'," + str(user_id) + ", 0)")
+			db.commit()
+		elif res[2]:
+			await respond(ctx, ["It looks like you're banned from borrowing books! " + random.choice(SAD_EMOJI),
+								"Please message <@" + str(ADMIN_USER) + "> if you think there is an error or a mistake.\n"])
+			return
+		unique_loan = len(cursor.execute(
+			"SELECT userid FROM loans WHERE userid = '" + str(user_id) + "' AND isbn = '" + str(
+				isbn) + "' AND returned IS FALSE;").fetchall())
+		if unique_loan == 0:
+			current_loans = len(cursor.execute(
+				"SELECT isbn FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall())
+			if current_loans < MAX_LOANS:
+				available = cursor.execute(
+					"SELECT * FROM books WHERE isbn IS '" + isbn + "' AND available >= 1;").fetchone()
+				if available is not None:
+					cursor.execute(
+						"UPDATE books SET available = available - 1 WHERE isbn IS '" + isbn + "' AND available >= 1;")
+					cursor.execute("INSERT INTO loans VALUES (NULL, '" + str(datetime.datetime.now()) + "', '" + str(
+						datetime.datetime.now() + datetime.timedelta(days=LOAN_PERIOD)) + "', FALSE, " + str(
+						user_id) + ", '" + isbn + "');")
+					db.commit()
+					messages.append('Great! The book is yours. ' + random.choice(HAPPY_EMOJI))
+					messages.append(BORROW_MESSAGE)
+					await respond(ctx, ["New Loan from " + user, isbn], admin=True)
+				else:
+					messages.append("I'm sorry, that book isn't available. " + random.choice(SAD_EMOJI))
 			else:
-				messages.append("I'm sorry, that book isn't available. " + random.choice(SAD_EMOJI))
+				messages.append("I'm sorry, it looks like you've reached your loan limit. " + random.choice(SAD_EMOJI))
 		else:
-			messages.append("I'm sorry, it looks like you've reached your loan limit. " + random.choice(SAD_EMOJI))
-	else:
-		messages.append(
-			"Sorry, you can't borrow that; it looks like you already have a copy on loan!  " + random.choice(SAD_EMOJI))
-	await respond(ctx, messages, dm=True)
+			messages.append(
+				"Sorry, you can't borrow that; it looks like you already have a copy on loan!  " + random.choice(SAD_EMOJI))
+		await respond(ctx, messages, dm=True)
 
 
 @bot.command(name='desc', pass_context=True, help='Show a short description for a book')
@@ -316,12 +323,13 @@ async def desc(ctx, isbn: str):
 		isbn: ISBN number of the book you'd like the description for.
 
 	"""
-	description = isbnlib.desc(isbn)
-	if description:
-		await respond(ctx, ["Here's a brief description of the book:", description])
-	else:
-		await respond(ctx, [
-			"Sorry, it doesn't look like we could find a description of that book " + random.choice(SAD_EMOJI)])
+	if await channel_check(ctx):
+		description = isbnlib.desc(isbn)
+		if description:
+			await respond(ctx, ["Here's a brief description of the book:", description])
+		else:
+			await respond(ctx, [
+				"Sorry, it doesn't look like we could find a description of that book " + random.choice(SAD_EMOJI)])
 
 
 @bot.command(name='cover', pass_context=True, help='Fetch an image of the cover for a book')
@@ -332,26 +340,28 @@ async def cover(ctx, isbn: str):
 		isbn: ISBN number of the you'd like the cover of.
 
 	"""
-	try:
-		cover_url = isbnlib.cover(isbn)['smallThumbnail']
-		url_hash = str(hash(cover_url)) + '.jpg'
-		urllib.request.urlretrieve(cover_url, url_hash)
-		with open(url_hash, 'rb') as f:
-			picture = discord.File(f)
-			await ctx.send(file=picture)
-		os.remove(url_hash)
-	except KeyError:
-		await respond(ctx, [
-			"Sorry, we couldn't find an image of that book's cover " + random.choice(SAD_EMOJI)])
+	if await channel_check(ctx):
+		try:
+			cover_url = isbnlib.cover(isbn)['smallThumbnail']
+			url_hash = str(hash(cover_url)) + '.jpg'
+			urllib.request.urlretrieve(cover_url, url_hash)
+			with open(url_hash, 'rb') as f:
+				picture = discord.File(f)
+				await ctx.send(file=picture)
+			os.remove(url_hash)
+		except KeyError:
+			await respond(ctx, [
+				"Sorry, we couldn't find an image of that book's cover " + random.choice(SAD_EMOJI)])
 
 
 @bot.command(name='suprise', pass_context=True, help='Display a random book from the library')
 async def suprise(ctx):
 	"""Display a random book from the library."""
-	book = cursor.execute("SELECT * FROM books ORDER BY RANDOM() LIMIT 1;").fetchone()
-	await respond(ctx, format_book_records([book]))
-	await ctx.invoke(bot.get_command('desc'), isbn=book[5])
-	await ctx.invoke(bot.get_command('cover'), isbn=book[5])
+	if await channel_check(ctx):
+		book = cursor.execute("SELECT * FROM books ORDER BY RANDOM() LIMIT 1;").fetchone()
+		await respond(ctx, format_book_records([book]))
+		await ctx.invoke(bot.get_command('desc'), isbn=book[5])
+		await ctx.invoke(bot.get_command('cover'), isbn=book[5])
 
 
 @bot.command(name='due', pass_context=True, help='Check which books you have loaned and when they are due')
@@ -363,18 +373,19 @@ async def due(ctx):
 				!due
 
 	"""
-	user_id = ctx.message.author.id
-	res = cursor.execute(
-		"SELECT isbn, estrdate, userid FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall()
-	if len(res) == 0:
-		await respond(ctx, [
-			"It looks like you don't have any books loaned to you at the moment " + random.choice(SAD_EMOJI) + "\n",
-			"Type `!help search` to find out how to search for books, and `!help borrow` for details " + "of how to get one! "
-			+ random.choice(HAPPY_EMOJI) + "\n"])
-	else:
-		books = due_books_preparse(res)
-		messages = (format_book_records(books, display_due_details=True))
-		await respond(ctx, messages, dm=True)
+	if await channel_check(ctx):
+		user_id = ctx.message.author.id
+		res = cursor.execute(
+			"SELECT isbn, estrdate, userid FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall()
+		if len(res) == 0:
+			await respond(ctx, [
+				"It looks like you don't have any books loaned to you at the moment " + random.choice(SAD_EMOJI) + "\n",
+				"Type `!help search` to find out how to search for books, and `!help borrow` for details " + "of how to get one! "
+				+ random.choice(HAPPY_EMOJI) + "\n"])
+		else:
+			books = due_books_preparse(res)
+			messages = (format_book_records(books, display_due_details=True))
+			await respond(ctx, messages, dm=True)
 
 
 def due_books_preparse(res):
@@ -399,7 +410,7 @@ async def renew(ctx, isbn: str, userid: str, days: int):
 		days: the number of days to renew the book for.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		new_date = datetime.datetime.now() + datetime.timedelta(days=days)
 		cursor.execute("UPDATE loans SET estrdate = '" + str(
 			new_date) + "' WHERE isbn IS '" + isbn + "' AND userid IS '" + userid + "';")
@@ -418,7 +429,7 @@ async def ban(ctx, userid: str):
 		userid: username of the user you want to ban.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		cursor.execute("UPDATE users SET banned = TRUE WHERE userid IS '" + userid + "';")
 		db.commit()
 		await respond(ctx, ['User banned.'], admin=True)
@@ -435,7 +446,7 @@ async def unban(ctx, userid: str):
 		userid: username of the user you want to unban.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		cursor.execute("UPDATE users SET banned = FALSE WHERE userid IS '" + userid + "';")
 		db.commit()
 		await respond(ctx, ['User unbanned.'], admin=True)
@@ -451,7 +462,7 @@ async def add(ctx, isbn: str, count: int = 1):
 		count: number of books you want to add.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		cursor.execute("UPDATE books SET available = available + '" + str(count) + "' WHERE isbn IS '" + isbn + "';")
 		db.commit()
 		await respond(ctx, ['Book count modified.'], admin=True)
@@ -467,7 +478,8 @@ async def remove(ctx, isbn: str, count: int = -1):
 		count: number of books you want to remove.
 
 	"""
-	await ctx.invoke(bot.get_command('add'), isbn=isbn, count=-abs(count))
+	if await auth_check(ctx) and await channel_check(ctx):
+		await ctx.invoke(bot.get_command('add'), isbn=isbn, count=-abs(count))
 
 
 @bot.command(name='delete', pass_context=True, hidden=True)
@@ -479,7 +491,7 @@ async def delete(ctx, isbn: str):
 		isbn: ISBN of the book you want to delete.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		cursor.execute(
 			"UPDATE loans SET returned = TRUE, rdate = '" + str(datetime.datetime.now()) + "' WHERE isbn IS '" +
 			isbn + "';")
@@ -498,7 +510,7 @@ async def return_(ctx, isbn: str, userid: int):
 		userid: the ID of the user who had the book loaned.
 
 	"""
-	if await auth_check(ctx):
+	if await auth_check(ctx) and await channel_check(ctx):
 		cursor.execute("UPDATE books SET available = available + 1 WHERE isbn IS '" + isbn + "';")
 		cursor.execute(
 			"UPDATE loans SET returned = TRUE, rdate = '" + str(datetime.datetime.now()) + "' WHERE isbn IS '" +
@@ -537,6 +549,20 @@ async def respond(ctx, messages: list, dm: bool = False, admin: bool = False, fa
 		else:
 			await channel.send(message)
 
+async def channel_check(ctx):
+	"""Confirm if the command originates from a specific channel.
+
+	Args:
+		ctx: Discord message context.
+
+	Returns:
+		True for allowed channel, False otherwise.
+
+	"""
+	if ctx.message.channel.id == DISCORD_CHANNEL or isinstance(ctx.channel, discord.channel.DMChannel):
+		return True
+	else:
+		return False
 
 async def auth_check(ctx):
 	"""Confirm if the user is authorised to call that command.
