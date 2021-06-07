@@ -14,6 +14,7 @@ import sys
 import isbnlib
 import discord
 from discord.ext import commands
+from discord.ext.tasks import loop
 from dotenv import load_dotenv
 
 __author__ = "Matthew Broadbent"
@@ -24,6 +25,7 @@ __version__ = "0.1.0"
 __maintainer__ = "Matthew Broadbent"
 __email__ = "matt@matthewbroadbent.net"
 __status__ = "Development"
+
 
 if __name__ == '__main__':
 
@@ -54,11 +56,34 @@ if __name__ == '__main__':
 
 	help_command = commands.DefaultHelpCommand(no_category='Commands')
 
+
+
 	bot = commands.Bot(
 		command_prefix=commands.when_mentioned_or('!'),
 		description='A Discord bot for managing and maintaining a physical book library.',
 		help_command=help_command
 	)
+
+
+@loop(hours=24)
+async def announce_overdue():
+	"""Periodically announce overdue books to the whole channel."""
+	channel = bot.get_channel(DISCORD_CHANNEL)
+	res = cursor.execute("SELECT isbn, estrdate, userid FROM loans WHERE estrdate < '" + str(
+		datetime.datetime.now()) + "' AND returned IS FALSE;").fetchall()
+	books = due_books_preparse(res)
+	await channel.send('**Reminder of Outstanding Books**')
+	for book in books:
+		mes = '*' + book[0][0] + '* — **' + str(abs(book[2])) + ' day(s) overdue!** ' + random.choice(
+			SAD_EMOJI) + ' <@' + str(book[3]) + '>'
+		await channel.send(mes)
+	await channel.send("Please message <@" + str(ADMIN_USER) + "> if you think there is an error or a mistake.")
+
+
+@bot.event
+async def on_ready():
+	"""Start timed functions on ready."""
+	announce_overdue.start()
 
 
 @bot.command(name='init', pass_context=True, hidden=True)
@@ -85,6 +110,7 @@ async def init(ctx, path: str = 'books.csv'):
 		"CREATE TABLE IF NOT EXISTS loans (rdate TIME, bdate TIME NOT NULL, estrdate TIME NOT NULL, returned BOOLEAN, "
 		"userid INTEGER, isbn TEXT, FOREIGN KEY (userid) REFERENCES users (userid), FOREIGN KEY (isbn) REFERENCES books ("
 		"isbn))")
+	await bot.wait_until_ready()
 	await ctx.invoke(bot.get_command('load'), path=path)
 	await respond(ctx, ['Bot successfully initialised.'], admin=True)
 
@@ -148,7 +174,6 @@ async def search(ctx, scope: str = 'all', attr: str = '*', value: str = '*'):
 	res = []
 	if attr == 'author':
 		attr = 'authors'
-	value.replace(" ", "_")
 	if scope == 'all':
 		if attr == '*':
 			res = cursor.execute("SELECT * FROM books ORDER BY title").fetchall()
@@ -252,7 +277,7 @@ async def borrow(ctx, isbn: str):
 		db.commit()
 	elif res[2]:
 		await respond(ctx, ["It looks like you're banned from borrowing books! " + random.choice(SAD_EMOJI),
-							"Please message <@" + str(ADMIN_USER) + "> if you think is a mistake.\n"])
+							"Please message <@" + str(ADMIN_USER) + "> if you think there is an error or a mistake.\n"])
 		return
 	unique_loan = len(cursor.execute(
 		"SELECT userid FROM loans WHERE userid = '" + str(user_id) + "' AND isbn = '" + str(
@@ -340,23 +365,28 @@ async def due(ctx):
 	"""
 	user_id = ctx.message.author.id
 	res = cursor.execute(
-		"SELECT isbn, estrdate FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall()
+		"SELECT isbn, estrdate, userid FROM loans WHERE userid = '" + str(user_id) + "' AND returned IS FALSE;").fetchall()
 	if len(res) == 0:
 		await respond(ctx, [
 			"It looks like you don't have any books loaned to you at the moment " + random.choice(SAD_EMOJI) + "\n",
 			"Type `!help search` to find out how to search for books, and `!help borrow` for details " + "of how to get one! "
 			+ random.choice(HAPPY_EMOJI) + "\n"])
 	else:
-		books = []
-		for (isbn, estrdate) in res:
-			book = cursor.execute("SELECT * FROM books WHERE isbn = '" + isbn + "';").fetchone()
-			date_obj = datetime.datetime.strptime(estrdate, '%Y-%m-%d %H:%M:%S.%f')
-			return_date = date_obj.date()
-			remaining = (date_obj - datetime.datetime.now()).days + 1
-			books.append((book, return_date, remaining))
+		books = due_books_preparse(res)
 		messages = (format_book_records(books, display_due_details=True))
 		await respond(ctx, messages, dm=True)
 
+
+def due_books_preparse(res):
+	"""Pre-parse and process results for due or overdue books"""
+	books = []
+	for (isbn, estrdate, userid) in res:
+		book = cursor.execute("SELECT * FROM books WHERE isbn = '" + isbn + "';").fetchone()
+		date_obj = datetime.datetime.strptime(estrdate, '%Y-%m-%d %H:%M:%S.%f')
+		return_date = date_obj.date()
+		remaining = (date_obj - datetime.datetime.now()).days + 1
+		books.append((book, return_date, remaining, userid))
+	return books
 
 @bot.command(name='renew', pass_context=True, hidden=True)
 async def renew(ctx, isbn: str, userid: str, days: int):
