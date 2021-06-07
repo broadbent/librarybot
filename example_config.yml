@@ -3,6 +3,14 @@ discord:
   admin_user: INSERT_USER_ID
 library:
   about: This is my library. My library is amazing.
+  tutorial:
+    - "1. Start by searching for a book e.g. ``!search all author abnett``"
+    - "2. Borrow a book from the library using the ISBN number (the long one in brackets next to each book) e.g. ``!borrow 9781844162949``"
+    - "3. Pick up the book."
+    - "4. Check on your current loans: what books you have on loan, how long you have left, etc. ``!due``"
+    - "5. Read the book :nerd:"
+    - "6. When done, return the book. We'll add it back to the library. You can then get another book out! :books:"
+    - "Check out the ``!help`` command for more even functionality."
   borrow_message: Great! Thanks for using my amazing library.
   loans:
     period: 60

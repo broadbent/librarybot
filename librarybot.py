@@ -44,6 +44,7 @@ if __name__ == '__main__':
 	DISCORD_CHANNEL = cfg['discord']['channel']
 	ADMIN_USER = cfg['discord']['admin_user']
 	ABOUT = cfg['library']['about']
+	TUTORIAL = cfg['library']['tutorial']
 	BORROW_MESSAGE = cfg['library']['borrow_message']
 	LOAN_PERIOD = int(cfg['library']['loans']['period'])
 	MAX_LOANS = int(cfg['library']['loans']['max'])
@@ -206,6 +207,13 @@ async def version(ctx, ):
 async def about(ctx, ):
 	"""Learn more about this library."""
 	await respond(ctx, [ABOUT])
+
+
+@bot.command(name='tutorial', pass_context=True, help='Get a short tutorial on how to use this library')
+async def tutorial(ctx, ):
+	"""Get a short tutorial on how to use this library."""
+	for message in TUTORIAL:
+		await respond(ctx, [message])
 
 
 @bot.command(name='issue', pass_context=True, help='Report an issue to the administrator')
