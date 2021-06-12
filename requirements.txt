@@ -1,3 +1,4 @@
+PyYAML==5.3.1
 discord.py==1.7.2
 isbnlib==3.10.7
 python-dotenv==0.17.1
