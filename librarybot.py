@@ -15,7 +15,6 @@ import isbnlib
 import discord
 from discord.ext import commands
 from discord.ext.tasks import loop
-from dotenv import load_dotenv
 
 __author__ = "Matthew Broadbent"
 __copyright__ = "Copyright 2021, Matthew Broadbent"
@@ -32,7 +31,6 @@ if __name__ == '__main__':
 	db = sqlite3.connect("./library.db")
 	cursor = db.cursor()
 
-	load_dotenv()
 	TOKEN = os.getenv('DISCORD_TOKEN')
 
 	config_path = "./config.yml"
