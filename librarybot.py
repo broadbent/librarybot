@@ -28,11 +28,7 @@ __status__ = "Development"
 
 if __name__ == '__main__':
 
-	db_path = "./library.db"
-	try:
-		config_path = sys.argv[1]
-	except IndexError:
-		pass
+	db_path = sys.argv[1]
 	db = sqlite3.connect(db_path)
 	cursor = db.cursor()
 
