@@ -29,13 +29,13 @@ __status__ = "Development"
 
 if __name__ == '__main__':
 
-	db = sqlite3.connect("library.db")
+	db = sqlite3.connect("./library.db")
 	cursor = db.cursor()
 
 	load_dotenv()
 	TOKEN = os.getenv('DISCORD_TOKEN')
 
-	config_path = "config.yml"
+	config_path = "./config.yml"
 	try:
 		config_path = sys.argv[1]
 	except IndexError:
