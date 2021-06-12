@@ -28,14 +28,19 @@ __status__ = "Development"
 
 if __name__ == '__main__':
 
-	db = sqlite3.connect("./library.db")
+	db_path = "./library.db"
+	try:
+		config_path = sys.argv[1]
+	except IndexError:
+		pass
+	db = sqlite3.connect(db_path)
 	cursor = db.cursor()
 
 	TOKEN = os.getenv('DISCORD_TOKEN')
 
 	config_path = "./config.yml"
 	try:
-		config_path = sys.argv[1]
+		config_path = sys.argv[2]
 	except IndexError:
 		pass
 
