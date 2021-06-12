@@ -1,3 +1,3 @@
 TODO:
     - Testing!
-    - Dockerfile
+    - configurable command

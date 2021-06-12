@@ -153,16 +153,16 @@ async def search(ctx, scope: str = 'all', attr: str = '*', value: str = '*'):
 
 	Examples:
 		Search the whole library:
-			!search
+			?search
 
 		Search for available books across the whole library:
-			!search available
+			?search available
 
 		Search for all books from Dan Abnett:
-			!search all authors abnett
+			?search all authors abnett
 
 		Search for available books from the Horus Heresy series:
-			!search available series heresy
+			?search available series heresy
 
 	Args:
 		scope (str): scope to perform search in. 'all' to search amongst all books, 'available' for those available for
@@ -266,7 +266,7 @@ async def borrow(ctx, isbn: str):
 
 	Examples:
 		Borrow 'Lone Wolves' from the library:
-			!borrow 9781789993158
+			?borrow 9781789993158
 
 	Args:
 		isbn: ISBN number of the book to borrow
@@ -369,7 +369,7 @@ async def due(ctx):
 
 		Examples:
 			Check your current loans:
-				!due
+				?due
 
 	"""
 	if await channel_check(ctx):
@@ -379,7 +379,7 @@ async def due(ctx):
 		if len(res) == 0:
 			await respond(ctx, [
 				"It looks like you don't have any books loaned to you at the moment " + random.choice(SAD_EMOJI) + "\n",
-				"Type `!help search` to find out how to search for books, and `!help borrow` for details " + "of how to get one! "
+				"Type `?help search` to find out how to search for books, and `?help borrow` for details " + "of how to get one! "
 				+ random.choice(HAPPY_EMOJI) + "\n"])
 		else:
 			books = due_books_preparse(res)
