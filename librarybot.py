@@ -246,7 +246,7 @@ async def tutorial(ctx, ):
 
 
 @bot.command(name='issue', pass_context=True, help='Report an issue to the administrator')
-async def issue_(ctx, issue: str):
+async def issue_(ctx, *args):
 	"""Report an issue to the administrator. Can be a problem with the system/bot or the library.
 
 	Args:
@@ -257,7 +257,7 @@ async def issue_(ctx, issue: str):
 		user_id = str(ctx.message.author.id)
 		user = await bot.fetch_user(int(user_id))
 		await respond(ctx, ["Thanks! You're issue has been forwarded to the administrator " + random.choice(HAPPY_EMOJI)])
-		await respond(ctx, ['Issue reported by: ' + str(user), issue], admin=True)
+		await respond(ctx, ['Issue reported by: ' + str(user), args], admin=True)
 
 
 @bot.command(name='borrow', pass_context=True, help='Borrow a book from the library')
