@@ -353,8 +353,8 @@ async def cover(ctx, isbn: str):
 				"Sorry, we couldn't find an image of that book's cover " + random.choice(SAD_EMOJI)])
 
 
-@bot.command(name='suprise', pass_context=True, help='Display a random book from the library')
-async def suprise(ctx):
+@bot.command(name='surprise', pass_context=True, help='Display a random book from the library')
+async def surprise(ctx):
 	"""Display a random book from the library."""
 	if await channel_check(ctx):
 		book = cursor.execute("SELECT * FROM books ORDER BY RANDOM() LIMIT 1;").fetchone()
