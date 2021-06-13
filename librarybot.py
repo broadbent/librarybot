@@ -20,7 +20,7 @@ __author__ = "Matthew Broadbent"
 __copyright__ = "Copyright 2021, Matthew Broadbent"
 __credits__ = ["Matthew Broadbent"]
 __license__ = "GPL"
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __maintainer__ = "Matthew Broadbent"
 __email__ = "matt@matthewbroadbent.net"
 __status__ = "Development"
@@ -256,8 +256,9 @@ async def issue_(ctx, *args):
 	if await channel_check(ctx):
 		user_id = str(ctx.message.author.id)
 		user = await bot.fetch_user(int(user_id))
+		message = " ".join(args)
 		await respond(ctx, ["Thanks! You're issue has been forwarded to the administrator " + random.choice(HAPPY_EMOJI)])
-		await respond(ctx, ['Issue reported by: ' + str(user), args], admin=True)
+		await respond(ctx, ['Issue reported by: ' + str(user), message], admin=True)
 
 
 @bot.command(name='borrow', pass_context=True, help='Borrow a book from the library')
